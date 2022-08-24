@@ -65,6 +65,6 @@ jobs:
           app-name: 'pruebasmp'
           slot-name: 'pruebaSmp'
           package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_AB9772770DFE4A3B8FDAEED8AFB2873A }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_AF316A309B17487C8BF3DE20163CD078 }}
           scm-do-build-during-deployment: true
           enable-oryx-build: true
