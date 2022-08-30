@@ -3,7 +3,10 @@
 # Manually managing azure-functions-worker may cause unexpected issues
 
 azure-functions
+azure-storage-file-datalake
 pandas
 numpy
 pyspark
 fastparquet
+grpcio-tools
+grpcio
