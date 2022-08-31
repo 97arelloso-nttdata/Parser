@@ -4,9 +4,9 @@
 
 azure-functions
 azure-storage-file-datalake
+azure-keyvault
+azure-identity
 pandas
 numpy
-pyspark
-fastparquet
 grpcio-tools
 grpcio

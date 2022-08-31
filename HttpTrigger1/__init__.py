@@ -4,11 +4,11 @@ import azure.functions as func
 
 from azure.storage.filedatalake import DataLakeServiceClient, DataLakeLeaseClient
 
-import pyspark
-from pyspark.sql import SparkSession
+from azure.keyvault.secrets import SecretClient
+from azure.identity import DefaultAzureCredential
 
 # Load packages for parser
-import os.path
+import os
 import pandas as pd
 import numpy as np
 from copy import copy, deepcopy
@@ -322,15 +322,23 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
 
 
     #connection_string = "DefaultEndpointsProtocol=https;AccountName=dlalex;AccountKey=ve15i2Y7cNoZMiQKdYa3FjL298efwf5HS9s9U53ddfKtdej4Ed4eWyspAOWqx4shiBYKOTjZaknw+ASthbPPBw==;EndpointSuffix=core.windows.net"
-    storage_account_key = "ve15i2Y7cNoZMiQKdYa3FjL298efwf5HS9s9U53ddfKtdej4Ed4eWyspAOWqx4shiBYKOTjZaknw+ASthbPPBw=="
-    storage_account_name = "dlalex"
+    #storage_account_key = "ve15i2Y7cNoZMiQKdYa3FjL298efwf5HS9s9U53ddfKtdej4Ed4eWyspAOWqx4shiBYKOTjZaknw+ASthbPPBw=="
 
+    # Get the env variable (Function App > Your_Function_App > Configuration > Under Application Settings)
+    KVUri = os.environ["KeyVaultUri"]
+
+    # Access Key Vault Secrets and specify what secret to access. In this case it's the storage account key
+    # for later connection.
+    credential = DefaultAzureCredential()
+    client = SecretClient(vault_url=KVUri, credential=credential)
+    storage_account_key = client.get_secret("storageAccountKey").value
+
+    storage_account_name = "dlalex"
     contenedor = "smp"
     source_dir = "raw_data"
     sink_dir = "processed_data"
     sink_file = file.split(".")[0] + ".csv"
 
-    # TODO hacerlo con Azure Key Vault
     # Generate the class DataLakeServiceClient for the ADL Gen2 defined.
     service_client_sink = DataLakeServiceClient(account_url="{}://{}.dfs.core.windows.net".format("https", storage_account_name), credential=storage_account_key)
 
