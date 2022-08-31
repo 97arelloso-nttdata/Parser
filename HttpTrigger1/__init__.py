@@ -310,6 +310,7 @@ class MEDData:
 def main(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('Python HTTP trigger function processed a request.')
 
+    # Collect the name of the .MED file to process (string: T001_H_20201001_MEDIDAS.MED)
     file = req.params.get('file')
     if not file:
         try:
@@ -329,28 +330,43 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     sink_dir = "processed_data"
     sink_file = file.split(".")[0] + ".csv"
 
+    # TODO hacerlo con Azure Key Vault
+    # Generate the class DataLakeServiceClient for the ADL Gen2 defined.
     service_client_sink = DataLakeServiceClient(account_url="{}://{}.dfs.core.windows.net".format("https", storage_account_name), credential=storage_account_key)
 
+    # Generate the instances where files are stored in the ADL.
+    # Define the ADL container.
     file_system_client = service_client_sink.get_file_system_client(file_system=contenedor)
+    # Define the source and sink directories.
     directory_client_source = file_system_client.get_directory_client(source_dir)
     directory_client_sink = file_system_client.get_directory_client(sink_dir)
+    # Define the source and sink files (.MED y .csv, respectively).
     file_client_source = directory_client_source.get_file_client(file)
     file_client_sink = directory_client_sink.create_file(sink_file)
 
-    source_lease_client = DataLakeLeaseClient(file_client_source)
+    # Request a new lease for the sink file. This serves that it cannot be
+    # modified/deleted by another process (for example, another call from 
+    # Azure Functions).
     sink_lease_client = DataLakeLeaseClient(file_client_sink)
-    source_lease_client.acquire(lease_duration=-1)
-    sink_lease_client.acquire(lease_duration=-1)
+    sink_lease_client.acquire()
 
+    # Define where to store the temporary files. In this case, it'll
+    # be in "/temp/", because it's a Linux machine.
     local_raw_path = "/tmp/"+ file
     local_sink_path = "/tmp/"+ sink_file
 
+    # Create on the local machine the .MED file (empty).
     local_file_prueba = open(local_raw_path, 'wb')
 
+    # Download from the ADL the .MED file and store it on the path "/tmp/"
+    # for the file just created.
     download = file_client_source.download_file()
     downloaded_bytes = download.readall()
     local_file_prueba.write(downloaded_bytes)
     
+    # TODO controlar las excepciones (aunque no debería pasar nada puesto
+    # que se ejecutan los parsers uno a uno).
+    # Apply .med parser.
     smp_class = MEDData(local_raw_path)
     smp_class.set_windfarm(file.split(".")[0])
     smp = smp_class.to_dataframe()
@@ -358,19 +374,22 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     # Change 'y_value' column to standard python float
     smp['y_value'] = [[float(y) for y in list(x)] for x in smp['y_value']]
 
-    smp_csv = smp.to_csv(local_sink_path)
-    #smp_parquet = smp.to_parquet(os.path.join("C:\IBD\Renovables\SMP\csv",'prueba.parquet'))
- 
+    # Store the generated .csv in the local path "/tmp/"
+    smp_csv = smp.to_csv(local_sink_path) 
 
+    # Open on read mode the .csv file created.
     local_file = open(local_sink_path,'r')
     file_contents = local_file.read()
 
-    file_client_sink.upload_data(data=file_contents, overwrite=True, length=len(file_contents))
-    file_client_sink.flush_data(len(file_contents))
-
-    source_lease_client.break_lease()
+    # Break the lease opened beforhand so it can be modified.
     sink_lease_client.break_lease()
 
+    # Upload de data to the ADL.
+    file_client_sink.upload_data(data=file_contents, overwrite=True, length=len(file_contents))
+    # Commit the data uploaded.
+    file_client_sink.flush_data(len(file_contents))
+
+    
     if file:
         return func.HttpResponse(f"The file {file} processed successfully. This HTTP triggered function executed successfully.")
     else:
